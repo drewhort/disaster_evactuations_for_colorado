@@ -1,1 +1,5 @@
-# disaster_evactuations_for_colorado
+#Extinguishing Bottlenecks: Optimizing Fire Evacuation Routes
+ 
+During disaster evacuations, it is crucial to have an evacuation plan that allows people to find safety in the shortest amount of time. In 2018, California experienced its most deadly fire to date, the Camp Fire, in which 85 civilians died. Due to the capacity of the roadways along evacuation routes, traffic jams trapped residents in their cars, killing at least 7 people. Colorado is no stranger to disaster. Last year there were 1,017 fires reported by the National Interagency Fire Center which burned a total 48,195 acres. This year we have already seen both the Marshall Fire and the NCAR fire force thousands of residents out of their homes. 
+ 
+Our project uses methods from optimization to identify 'bottlenecks’ in evacuation routes so that we can ensure that every resident can safely evacuate during a disaster. We model the potential evacuation routes as a network and solve a maximum flow problem. The solution to this maximum flow instance identifies both the capacities and locations of bottlenecks in our network. This information can inform policy makers on areas to consider expanding capacities to reduce the risk of a traffic jam in evacuation situations.
