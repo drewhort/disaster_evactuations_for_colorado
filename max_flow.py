@@ -66,90 +66,76 @@ def add_capacities(G, method=moore):
     
 '''
 MAXIMUM FLOW SHORTEST PATH ALGORITHM (ONE ITERATION) FOR DATA FRAME
-
-
-I think something has gone wrong here with there aren't indices for when we are going backward on edges, because they don't exist in the DF. Need to add them in somehow.
 '''
 
 def upres(edgematrix, path):
-    #print('!!!!!edgematrix',edgematrix)
-    #edgematrix=edgematrix.copy()
+
     caps=edgematrix['capacity']
-    #print('caps',caps)
     flo = caps.max()
-    #print('capacity flow', flo)
-    #print(edgematrix.columns)
-    #print('!!!!!path',path)
+    #finds the capacities of each edge in the shortest path
     for i in range(len(path)-1):
-        #print(path)
         j = path[i]
         k = path[i+1]
 
-        
+        #find the rows of the data frame that match the arc (j,k) in the network and the arc (k,j) in the residual network
         forward_index = edgematrix.loc[(edgematrix['source']==j) & (edgematrix['target']==k)]
         backward_index = edgematrix.loc[(edgematrix['source']==k) & (edgematrix['target']==j)]
         
+        #If the arcs don't exist in the data frame (i.e. one way road in the original network, then we need to add in the arc to the residual
         if forward_index.empty == True:
-             #print('before before!!',forward_index)
+             #appends a row of all 0's to the empty dataframe forward_index
              forward_index=forward_index.append(pd.Series(0, index=edgematrix.columns), ignore_index=True)
+             #assigns the correct values of j,k, 'capacity' to the arc
              forward_index.at[0,'capacity']= 0
              forward_index.at[0,'source']= j
              forward_index.at[0,'target']= k
-             #print('before forward!!!',forward_index)
+             #appends the row to the edgematrix
              edgematrix=pd.concat([edgematrix,forward_index],ignore_index=True)
+             #we can now find the index in edgematrix that corresponds to (j,k) so that we can appropriately update capacity after augmenting flow
              forward_index = edgematrix.loc[(edgematrix['source']==j) & (edgematrix['target']==k)]
-             #print('after forward!!!',forward_index)
              
-             
+        #this works the same as above, but for edge (k,j)     
         if backward_index.empty == True:
              backward_index=backward_index.append(pd.Series(0, index=edgematrix.columns), ignore_index=True)
-             #print('before before!! backward',backward_index)
              backward_index.at[0,'capacity']= 0
              backward_index.at[0,'source']= k
              backward_index.at[0,'target']= j
-             #print('before!!! backward',backward_index)
              edgematrix=pd.concat([edgematrix,backward_index],ignore_index=True)
              backward_index = edgematrix.loc[(edgematrix['source']==k) & (edgematrix['target']==j)]
-             #print('after!!backward',backward_index)
-                    
-        #print('!!!!!! forward index', forward_index)
+        
+        #get index for the forward arc from our path
         for row in forward_index.index:
             forward=row
-            #print('forward',forward)
-        #print('!!!!!! backward index', backward_index)
-        for row in backward_index.index:
-            backward=row
-            #print('backward',backward)
+
+        #get the edge capacity from the graph
         cap = edgematrix.loc[forward].at['capacity']
-       
-        #print('cap',type(cap),cap)
         
+        #if the capacity is lower than the current flow, set flow to be the capacity of the edge
         if cap < flo:
             flo = cap
             
-    print('actual flow',type(flo),flo)
+    print('flow',flo)
     
-    #updates residual graph to give us max flow
+    #augments flow and updates residual graph
     for i in range(len(path)-1):
         j = path[i]
         k = path[i+1]
         
-        #forward=0
-        #backward=0
-        
+        #again find the location of our indices
         forward_index = edgematrix.loc[(edgematrix['source']==j) & (edgematrix['target']==k)]
         backward_index = edgematrix.loc[(edgematrix['source']==k) & (edgematrix['target']==j)]
         
+        #assign the indices 
         for row in forward_index.index:
             forward=row
         
         for row in backward_index.index:
-            backward=row
+            backward=row 
         
-        #print(edgematrix.loc[forward].at['capacity'])
+        #augment flow and update the residual network.
         edgematrix.at[forward,'capacity']= edgematrix.loc[forward].at['capacity']-flo
         edgematrix.at[backward,'capacity']= edgematrix.loc[backward].at['capacity']+flo
-        #print(edgematrix.loc[forward].at['capacity'])
+
         
     return (edgematrix,flo)    
     
@@ -159,7 +145,7 @@ Building the Graph
 '''
     
 #import data from osmnx, can input any city, state, etc.
-G = ox.project_graph(ox.graph_from_place('Santa Rosa, California', network_type='drive'))
+G = ox.project_graph(ox.graph_from_place('Butte, California', network_type='drive'))
 
 #get rid of intersections that are not actually intersections
 G = ox.consolidate_intersections(G, tolerance=10, rebuild_graph=True, dead_ends=True)
@@ -172,9 +158,10 @@ G = ox.speed.add_edge_travel_times(G)
 
 #add capacities (computed using moore method)
 edge_data,G =add_capacities(G)
+
+#G changes, so we want to have an original network to later plot the shortest paths on
 G_original=G.copy()
 
-G_orig_nodes_df,G_orig_edges_df=ox.utils_graph.graph_to_gdfs(G)
 
 
 '''
@@ -187,49 +174,62 @@ Plotting the Graph with edge colors corresponding to edge attributes
 #plt.show()
 
 
-#plot G with the edges colored by travel time
-#ec = ox.plot.get_edge_colors_by_attr(G_original, attr="speed_kph")
+#plot G with the edges colored by speed kph
+ec = ox.plot.get_edge_colors_by_attr(G_original, attr="speed_kph")
 #fig, ax = ox.plot_graph(G_original, edge_color=ec,node_size=2)
 #plt.show()
 
 
 #plot G with the edges colored by travel time
-ec = ox.plot.get_edge_colors_by_attr(G_original, attr="travel_time")
+#ec = ox.plot.get_edge_colors_by_attr(G_original, attr="travel_time")
 #fig, ax = ox.plot_graph(G_original, edge_color=ec,node_size=2)
 #plt.show()
    
 
 '''
 Find the inital flow (Shortest Path)
+You need to choose a orig and dest, and also make sure that the respective area is put into line 148.
 '''
 
-#define a start node and a sink node (currently random)
-#Lyons random ex
-orig, dest = list(G)[8], list(G)[15]
-#Boulder County random ex
-#orig, dest = list(G)[1], list(G)[9533]
+#define a start node and a sink node
 
-#paradise only
-#orig,dest=list(G)[530],list(G)[531]
-#butte county
-#orig,dest=list(G)[5031],list(G)[995] # also works for boulder county
-
-#boulder county, start is near where marshall fire was and sink is near where and evacuation center was
-#orig=ox.distance.nearest_nodes(G,486600,4421340,return_dist=False)
-#dest=ox.distance.nearest_nodes(G,482360,4433360,return_dist=False)
+#boulder county (use boulder county as map)
+#this origin is where the marshall fire started
+#orig=ox.distance.nearest_nodes(G,479800,4424260,return_dist=False)
+#destination is the evacuation center listed for marshall fire
+#dest=ox.distance.nearest_nodes(G,489130,4429760,return_dist=False)
+#alternative origin that is in superior which was higly affected by the marshall fire
+#orig=ox.distance.nearest_nodes(G,485830,4423270,return_dist=False)
 
 #pueblo west (use pueblo county as the map)
 #not the right origin/dest I think
 #orig=ox.distance.nearest_nodes(G,5255180,4250280,return_dist=False)
 #orig=ox.distance.nearest_nodes(G,514380,4242010,return_dist=False)
 
-#good pueblo west ones!!!
+#Another Pueblo West
 #orig=ox.distance.nearest_nodes(G,514930, 4241970,return_dist=False)
 #dest=ox.distance.nearest_nodes(G,530020,4232490,return_dist=False)
 
-#Lyons, CO (run on boulder county) !!!! so good!!
+#Lyons, CO (run on boulder county) 
 #orig=ox.distance.nearest_nodes(G,477230,4453570,return_dist=False)
 #dest=ox.distance.nearest_nodes(G,476140,4430890,return_dist=False)
+
+#Ken Caryl (Jefferson County, CO)
+#orig=ox.distance.nearest_nodes(G,489685,4379999,return_dist=False)
+#dest=ox.distance.nearest_nodes(G,494940,4393420,return_dist=False)
+
+#Heildsburg, CA (run on Sonoma County, CA)
+#orig=ox.distance.nearest_nodes(G,512007,4273277,return_dist=False)
+#santa rosa destination
+#dest=ox.distance.nearest_nodes(G,525300,4255270,return_dist=False)
+#petaluma destination
+#dest=ox.distance.nearest_nodes(G,532060,4233990,return_dist=False)
+
+#Paradise (Butte County, CA)
+#where the camp fire started
+orig=ox.distance.nearest_nodes(G,621540,4406520,return_dist=False)
+#chico was one of the places you could evacuate to
+dest=ox.distance.nearest_nodes(G,599230,4400090,return_dist=False)
 
 
 #define empty list to store shortest paths
@@ -252,16 +252,17 @@ edgematrix = nx.to_pandas_edgelist(G)
 #egdgematrix=ox.utils_graph.graph_to_gdfs(G,)
 
 
+
+'''
+Maximum Flow Algorithm
+'''
 #Initializing the original flow using the first shortest path found above
 edgematrix,flo=upres(edgematrix,shortest_path)
 
-
-'''
-While loop iterates through each augmentation of the max flow
-'''
-
-
+#i is the counter 
 i=1
+
+#while loop iterates through each shortest augmenting path
 while shortest_path is not None:
     i+=1
     
@@ -278,8 +279,8 @@ while shortest_path is not None:
 
     #recompute the shortest path from s to t in the residual network with weights travel_time
     shortest_path=ox.distance.shortest_path(G_shorty, orig, dest, weight='travel_time')
-   
-   
+    
+    #Append non-empty shortest paths to the shortest path list
     if shortest_path is not None:
         shortest_path_list.append(shortest_path)
         print('iteration',i,'shortest path', shortest_path)
@@ -291,10 +292,12 @@ while shortest_path is not None:
         edgematrix,flo=upres(edgematrix,shortest_path) 
 
     
- #print all of our different paths.   
-print('shortest path list',shortest_path_list, type(shortest_path_list), len(shortest_path_list))
+#print all of our different paths.   
+print('shortest path list',shortest_path_list, len(shortest_path_list))
 
-#need to get all the paths that exist in original network G
+'''
+We want to only plot the paths that exist in the original network
+'''
 sp_list=[]
 for path in shortest_path_list:
     sp=[]
@@ -308,14 +311,20 @@ for path in shortest_path_list:
     #print(t)
     if t==True:
         sp_list.append(path)
-        
-#shortest_path_list.pop()
+    
 print(sp_list)
 
+'''
+Get the maximum flow value
+'''
 max_flow=edgematrix.loc[orig].at['capacity']
 
 print('max_flow',max_flow)
 
+
+'''
+Gets n evenly spaced colors to map the different path with from the colormap 'hsv'
+'''
 
 def get_colors(n, cmap='hsv', start=0., stop=1., alpha=1.):
 
@@ -335,9 +344,5 @@ else:
     fig, ax = ox.plot_graph_route(G_original, sp_list[0], route_color='y', route_linewidth=6, node_size=2,edge_color=ec)
     plt.show()
     
-#G=ox.utils_graph.graph_from_gdfs(G_orig_nodes_df,edgematrix,graph_attrs=G_original.crs)   
-    
-#cl=get_colors(len(shortest_path_list))
-#fig, ax = ox.plot_graph_routes(G, shortest_path_list, route_colors=cl, route_linewidth=6, node_size=2,edge_color=ec)
-#plt.show()    
+
     
